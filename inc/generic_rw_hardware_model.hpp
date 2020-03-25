@@ -39,13 +39,15 @@ namespace Nos3
     private:
         void send_periodic_data(NosEngine::Common::SimTime time);
         void create_rw_data(const GenericRWDataPoint& data_point, std::vector<uint8_t>& out_data);
+        std::string handle_command(std::string command);
+
 
         std::atomic<bool>                       _keep_running;
         SimIDataProvider*                       _sdp;
         std::unique_ptr<NosEngine::Client::Bus> _time_bus;
         std::unique_ptr<NosEngine::Uart::Uart>  _uart_connection;
         double                                  _prev_data_sent_time = 0;
-        double                                  _period = 10.0;
+        double                                  _period = 0.1;
     };
 }
 

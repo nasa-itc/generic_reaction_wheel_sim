@@ -1,13 +1,8 @@
-# Sample - NOS3 Simulator
+# Generic Reaction Wheel - NOS3 Simulator
 
 This repository contains an example Generic Reaction Wheel NOS3 Simulator.
 
 ## Documentation
-Currently support exists for the following versions:
-* [Sample Link](https://cfs.gsfc.nasa.gov/)
-
-Vendor repositories: 
-* https://code.nasa.gov/
 
 ### Versioning
 We use [SemVer](http://semver.org/) for versioning. For the versions available, see the tags on this repository.

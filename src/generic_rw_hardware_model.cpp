@@ -110,17 +110,45 @@ namespace Nos3
     {
         // Get the data out of the message bytes
         std::vector<uint8_t> in_data(buf, buf + len);
-        sim_logger->debug("GenericRWHardwareModel::uart_read_callback:  REQUEST %s",
-            SimIHardwareModel::uint8_vector_to_hex_string(in_data).c_str()); // log data in a man readable format
+        std::string request = SimIHardwareModel::uint8_vector_to_ascii_string(in_data);
+        sim_logger->debug("GenericRWHardwareModel::uart_read_callback:  REQUEST %s", request.c_str()); // log data in a man readable format
 
-        // Figure out how to respond (possibly based on the in_data)
-        std::vector<uint8_t> out_data = in_data; // Just echo
+        // Figure out how to respond
+        std::string response = handle_command(request);
 
         // Ship the message bytes off
-        sim_logger->debug("GenericRWHardwareModel::uart_read_callback:  REPLY   %s\n",
-            SimIHardwareModel::uint8_vector_to_hex_string(out_data).c_str()); // log data in a man readable format
-
+        std::vector<uint8_t> out_data = SimIHardwareModel::ascii_string_to_uint8_vector(response);
+        sim_logger->debug("GenericRWHardwareModel::uart_read_callback:  REPLY   %s\n", response.c_str()); // log data in a man readable format
         _uart_connection->write(&out_data[0], out_data.size());
+    }
+
+    std::string GenericRWHardwareModel::handle_command(std::string command)
+    {
+        std::string response = "Unknown_Command=" + command;
+        boost::to_upper(command);
+        if (command.substr(0,11).compare("SET_TORQUE=") == 0)
+        {
+            double torque = 0.0;
+            try {
+                torque = std::stod(command.substr(11));
+            }
+            catch (...) {
+                sim_logger->error("Invalid torque command value");
+            }
+            std::stringstream ss;
+            ss << "SC[0].AC.Whl[0].Tcmd = ";
+            ss << torque;
+
+            dynamic_cast<GenericRWData42SocketProvider*>(_sdp)->send_command_to_socket(ss.str());
+            response = "Set_Torque=" + ss.str();
+        } else if (command.substr(0,16).compare("CURRENT_MOMENTUM") == 0)
+        {
+            const boost::shared_ptr<GenericRWDataPoint> data_point =
+                boost::dynamic_pointer_cast<GenericRWDataPoint>(_sdp->get_data_point());
+            response = "Current_Momentum=" + std::to_string(data_point->get_momentum());
+        }
+
+        return response;
     }
 
     void GenericRWHardwareModel::command_callback(NosEngine::Common::Message msg)
@@ -131,19 +159,18 @@ namespace Nos3
 
         // Do something with the data
         std::string command = dbf.data;
-        std::string response = "GenericRWHardwareModel::command_callback:  INVALID COMMAND! (Try STOP FOOSIM)";
+        std::string response = "GenericRWHardwareModel::command_callback:  INVALID COMMAND! (Try STOP RWSIM)";
         boost::to_upper(command);
         if (command.substr(0,11).compare("STOP RWSIM") == 0) 
         {
             _keep_running = false;
-            response = "GenericRWHardwareModel::command_callback:  STOPPING FOOSIM";
-        } else if (command.substr(0,6).compare("TORQUE") == 0)
-        {
-            dynamic_cast<GenericRWData42SocketProvider*>(_sdp)->send_command_to_socket("SC[0].AC.Whl[0].Tcmd = 0.1");
-            response = "GenericRWHardwareModel::command_callback:  TORQUING REACTION WHEEL";
+            response = "GenericRWHardwareModel::command_callback:  STOPPING RWSIM";
+        } else {
+            response = handle_command(command);
         }
 
         // Here's how to send a reply
+        sim_logger->info("GenericRWHardwareModel::command_callback:  Sending reply: %s.", response.c_str());
         _command_node->send_reply_message_async(msg, response.size(), response.c_str());
     }
 
@@ -163,25 +190,22 @@ namespace Nos3
         }
     }
 
-    typedef union {
-        double  d_mom;
-        uint8_t u_mom[8];
-    } momentum_union;
-
     void GenericRWHardwareModel::create_rw_data(const GenericRWDataPoint& data_point, std::vector<uint8_t>& out_data)
     {
-        momentum_union mu;
-        mu.d_mom = data_point.get_momentum();
-        out_data.push_back(mu.u_mom[0]);
-        out_data.push_back(mu.u_mom[1]);
-        out_data.push_back(mu.u_mom[2]);
-        out_data.push_back(mu.u_mom[3]);
-        out_data.push_back(mu.u_mom[4]);
-        out_data.push_back(mu.u_mom[5]);
-        out_data.push_back(mu.u_mom[6]);
-        out_data.push_back(mu.u_mom[7]);
-        sim_logger->debug("GenericRWHardwareModel::create_rw_data:  Momentum:  double=%f, uint8_t[8]=0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x", 
-            mu.d_mom, mu.u_mom[0], mu.u_mom[1], mu.u_mom[2], mu.u_mom[3], mu.u_mom[4], mu.u_mom[5], mu.u_mom[6], mu.u_mom[7]);
+        double momentum = data_point.get_momentum();
+        std::stringstream ss;
+
+        ss << "MOMENTUM=";
+        ss << std::setprecision(6);
+        ss << momentum;
+        std::string message;
+        message.append(ss.str());
+
+        for (size_t i = 0; i < message.length(); i++) {
+            out_data.push_back(message[i]);
+        }
+
+        sim_logger->trace("GenericRWHardwareModel::create_rw_data:  %s", message.c_str());
     }
 
 }
