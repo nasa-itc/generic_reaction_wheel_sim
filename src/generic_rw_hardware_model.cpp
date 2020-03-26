@@ -56,8 +56,8 @@ namespace Nos3
         _time_bus.reset(new NosEngine::Client::Bus(_hub, connection_string, time_bus_name));
 
         // Here's how to get a UART node to communicate with
-        std::string bus_name = "usart_0";
-        int node_port = 0;
+        std::string bus_name = "usart_2";
+        int node_port = 2;
         if (config.get_child_optional("simulator.hardware-model.connections")) 
         {
             BOOST_FOREACH(const boost::property_tree::ptree::value_type &v, config.get_child("simulator.hardware-model.connections")) 
@@ -80,8 +80,8 @@ namespace Nos3
         std::string dp_name = config.get("simulator.hardware-model.data-provider.type", "GENERICRWSIMDATA42SOCKETPROVIDER");
         _sdp = SimDataProviderFactory::Instance().Create(dp_name, config);
 
-        _prev_data_sent_time = _absolute_start_time + 10.0;
-        _time_bus->add_time_tick_callback(std::bind(&GenericRWHardwareModel::send_periodic_data, this, std::placeholders::_1));
+        //_prev_data_sent_time = _absolute_start_time + 10.0;
+        //_time_bus->add_time_tick_callback(std::bind(&GenericRWHardwareModel::send_periodic_data, this, std::placeholders::_1));
 
         sim_logger->trace("GenericRWHardwareModel::GenericRWHardwareModel:  Time node, UART node, data provider created; constructor exiting");
     }
@@ -140,12 +140,12 @@ namespace Nos3
             ss << torque;
 
             dynamic_cast<GenericRWData42SocketProvider*>(_sdp)->send_command_to_socket(ss.str());
-            response = "Set_Torque=" + ss.str();
+            response = "SET_TORQUE=" + ss.str();
         } else if (command.substr(0,16).compare("CURRENT_MOMENTUM") == 0)
         {
             const boost::shared_ptr<GenericRWDataPoint> data_point =
                 boost::dynamic_pointer_cast<GenericRWDataPoint>(_sdp->get_data_point());
-            response = "Current_Momentum=" + std::to_string(data_point->get_momentum());
+            response = "CURRENT_MOMENTUM=" + std::to_string(data_point->get_momentum());
         }
 
         return response;
